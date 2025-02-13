@@ -23,6 +23,10 @@ const userSchema = new Schema({
         required: [true, 'Please Entre A Valid Password']
     },
 
+    bio : String,
+
+    about : String,
+
     posts : [
         {
             type: mongoose.Schema.Types.ObjectId,

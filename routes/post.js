@@ -17,9 +17,9 @@ router.post('/createpost', fetchUser,
         }
 
         try {
-            const myCloud = await cloudinary.v2.uploader.upload(req.body.image, {
-                folder: "ArtgalleryPosts"
-            })
+            // const myCloud = await cloudinary.v2.uploader.upload(req.body.image, {
+            //     folder: "ArtgalleryPosts"
+            // })
 
             // console.log(myCloud);
             if (!req.user._id) {
@@ -28,7 +28,7 @@ router.post('/createpost', fetchUser,
 
             const user = await User.findById(req.user._id);
             let newPostDetails = []
-            if(req.body.price){
+            if (req.body.price) {
                 newPostDetails = {
                     caption: req.body.caption,
                     image: {
@@ -51,13 +51,13 @@ router.post('/createpost', fetchUser,
                     buyFlag: false
                 };
             }
-           
+
             const newPost = await Post.create(newPostDetails);
             user.posts.push(newPost._id);
             await user.save();
             res.status(200).json(newPost);
         } catch (error) {
-            res.status(500).json({ place: "post creation", error: "Internal server error! Please try again later.",  err: error.message });
+            res.status(500).json({ place: "post creation", error: "Internal server error! Please try again later.", err: error.message });
 
         }
     }
@@ -137,7 +137,7 @@ router.get('/feedposts', fetchUser, async (req, res) => {
             owner: {
                 $in: followingUsers
             }
-        })
+        }).populate('owner', '-password').populate('likes', '-password').populate('comments.user', '-password');
 
         res.status(200).json({ followingUsers, feedposts });
     } catch (error) {
@@ -171,7 +171,7 @@ router.put('/update/:_id', fetchUser, async (req, res) => {
 
 
 // comment addition
-router.get('/addcomment/:_id', fetchUser,
+router.post('/addcomment/:_id', fetchUser,
     [body('comment').exists().withMessage("Please add a valid comment")],
     async (req, res) => {
         const result = validationResult(req);
@@ -183,24 +183,24 @@ router.get('/addcomment/:_id', fetchUser,
             const user = await User.findById(req.user._id);
             const post = await Post.findById(req.params._id);
 
-            if(!post) {
-                return res.status(404).json({error: "Post not found."})
+            if (!post) {
+                return res.status(404).json({ error: "Post not found." })
             }
 
             let commentExistsId = -1;
             post.comments.forEach((item, index) => {
-                if(item.user.toString() === user._id.toString()){
-                    return commentExistsId = index; 
+                if (item.user.toString() === user._id.toString()) {
+                    return commentExistsId = index;
                 }
             })
 
             console.log(commentExistsId);
             const { comment } = req.body;
 
-            if(commentExistsId !== -1) {
+            if (commentExistsId !== -1) {
                 post.comments[commentExistsId].comment = comment;
                 await post.save();
-                return res.status(200).json({flag: "Comment updated", comments: post.comments, newComment: post.comments[commentExistsId], })
+                return res.status(200).json({ flag: "Comment updated", comments: post.comments, newComment: post.comments[commentExistsId], })
             }
             const newComment = {
                 user: user._id,
@@ -219,48 +219,48 @@ router.get('/addcomment/:_id', fetchUser,
 
 
 // comment deletion
-router.delete('/deletecomment/:_id', fetchUser, async (req, res) =>{
+router.delete('/deletecomment/:_id', fetchUser, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
         const post = await Post.findById(req.params._id);
 
-        if(!post) {
-            return res.status(404).json({error: "Post not found."})
+        if (!post) {
+            return res.status(404).json({ error: "Post not found." })
         }
 
         if (post.owner.toString() === user._id.toString()) {
 
-            if(req.body.commentId === undefined) {
-                return res.status(400).json({error: "Comment Id is required."});
+            if (req.body.commentId === undefined) {
+                return res.status(400).json({ error: "Comment Id is required." });
             }
             post.comments.forEach((item, index) => {
-                if(item._id.toString() === req.body.commentId.toString()){
+                if (item._id.toString() === req.body.commentId.toString()) {
                     return post.comments.splice(index, 1);
                 }
             });
             await post.save();
-            return res.status(200).json({flag: "Selected comment has been deleted.", nowComment: post.comments});
-            
+            return res.status(200).json({ flag: "Selected comment has been deleted.", nowComment: post.comments });
+
         } else {
             let hasComment = false
             post.comments.forEach((item, index) => {
-                if(item.user.toString() === user._id.toString()){
+                if (item.user.toString() === user._id.toString()) {
                     post.comments.splice(index, 1);
                     hasComment = true;
                 }
             });
-            if(hasComment) {
+            if (hasComment) {
                 await post.save();
-                return res.status(200).json({flag: "Your comment has been deleted.", nowComment: post.comments});
+                return res.status(200).json({ flag: "Your comment has been deleted.", nowComment: post.comments });
             }
-            else{
-                return res.status(404).json({error: "No comment found."})
+            else {
+                return res.status(404).json({ error: "No comment found." })
             }
         }
-        
+
     } catch (error) {
         res.status(500).json({ place: "CommentD", error: "Internal server error! Please try again later.", err: error.message });
-        
+
     }
 });
 
@@ -281,23 +281,38 @@ router.get('/sortedposts', fetchUser, async (req, res) => {
         const sortedPosts = await Post.aggregate([
             {
                 $project: {
-                  owner: 1,                // Include the 'owner' field
-                  image: 1,                // Include the 'image' field
-                  caption: 1,              // Include the 'caption' field
-                  date: 1,                 // Include the 'date' field
-                  likesCount: { $size: "$likes" },  // Calculate and include the size of 'likes' array as 'likesCount'
-                  likes: 1,                // Include the 'likes' field (if you still want to include the list of users who liked)
-                  comments: 1,             // Include the 'comments' field
-                  price: 1,                // Include the 'price' field
-                  buyFlag: 1               // Include the 'buyFlag' field
+                    owner: 1,                // Include the 'owner' field
+                    image: 1,                // Include the 'image' field
+                    caption: 1,              // Include the 'caption' field
+                    date: 1,                 // Include the 'date' field
+                    likesCount: { $size: "$likes" },  // Calculate and include the size of 'likes' array as 'likesCount'
+                    likes: 1,                // Include the 'likes' field (if you still want to include the list of users who liked)
+                    comments: 1,             // Include the 'comments' field
+                    price: 1,                // Include the 'price' field
+                    buyFlag: 1               // Include the 'buyFlag' field
                 }
             },
             {
                 $sort: { likesCount: -1 }
-            }  
-            ]);
-            
-       res.status(200).json(sortedPosts);
+            }
+        ]);
+        const postsWithPopulatedLikesComments = await Post.populate(sortedPosts,
+            [{
+                path: 'likes',
+                select: '-password'
+            },
+            {
+                path: 'comments.user',
+                select: '-password'
+            },
+            {
+                path: 'owner',
+                select: '-password'
+            }]
+        );
+
+
+        res.status(200).json(postsWithPopulatedLikesComments);
     } catch (error) {
         res.status(500).json({ place: "Buy posts", error: "Internal server error! Please try again later.", err: error.message });
     }

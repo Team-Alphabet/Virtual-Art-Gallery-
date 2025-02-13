@@ -35,7 +35,7 @@ router.post('/signup',
             const secured_pass = await bcrypt.hash(password, salt);
 
             // user with profile pic
-            if(profilePic) {
+            if (profilePic) {
                 const myCloud = await cloudinary.v2.uploader.upload(req.body.profilePic, {
                     folder: "ArtgalleryProfiles"
                 });
@@ -52,14 +52,18 @@ router.post('/signup',
             }
 
             // user without profile pic
-            else{
+            else {
                 user = {
                     userName: userName,
+                    profilePic: {
+                        public_id: null,
+                        url: null
+                    },
                     email: email,
                     password: secured_pass
                 };
             }
-           
+
 
             const newUser = await User.create(user)
             res.status(200).json(newUser);
@@ -101,7 +105,10 @@ router.post('/login',
 
             const option = {
                 maxAge: 90 * 24 * 60 * 60 * 60 * 1000,
-                httpOnly: true
+                httpOnly: true,
+                // secure: process.env.NODE_ENV === "production", // make sure this is true in production
+                // sameSite: "None", // required for cross-site cookies
+
             }
 
             const token = jwt.sign(PAYLOAD, jwtsecret);
@@ -191,7 +198,7 @@ router.get('/changepass', fetchUser,
 );
 
 // forgot password
-router.get('/forgotpass', fetchUser, async (req, res) => {
+router.get('/forgotpass', async (req, res) => {
     try {
         const { email } = req.body;
         const user = await User.findOne({ email: email });
@@ -240,7 +247,7 @@ router.get('/updateprofile', fetchUser,
         }
 
         try {
-           
+
             const { newEmail, newUserName, newProfilePic } = req.body;
             const user = await User.findById(req.user._id);
             if (newEmail) {
@@ -251,7 +258,7 @@ router.get('/updateprofile', fetchUser,
                 user.userName = newUserName;
             }
 
-            if(newProfilePic) {
+            if (newProfilePic) {
                 const myCloud = await cloudinary.v2.uploader.upload(req.body.newProfilePic, {
                     folder: "ArtgalleryProfiles"
                 });
@@ -260,7 +267,7 @@ router.get('/updateprofile', fetchUser,
                     url: myCloud.secure_url
                 };
             }
-           
+
             await user.save();
             res.status(200).json({ success: true, user })
         } catch (error) {
